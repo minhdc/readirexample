@@ -8,8 +8,8 @@ def init_csv_file(csv_filename_as_path):
 
 
 def write_eml_data_to_csv_file(csv_filename_as_path,eml_file_name,size,a_address,b_address,c_address,date):
-    if csv.Sniffer().has_header(csv_filename_as_path):
-        print("has header")
+    #if csv.Sniffer().has_header(csv_filename_as_path):
+        #print("has header")
     with open(csv_filename_as_path,'a') as csvfile:
         fieldnames = ['eml_file_name','size','a_address','b_address','c_address','date']                 
         writer = csv.DictWriter(csvfile,fieldnames = fieldnames)
