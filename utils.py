@@ -59,17 +59,28 @@ def get_current_dir_list(curren_path):
     result = [os.path.join(curren_path,x) for x in os.listdir(curren_path)]    
     return result
 
+def get_target_list_from_folder(target_folder_path):
+    target_list = []
+    for each_file in os.listdir(target_folder_path):
+        with open(os.path.join(target_folder_path,each_file)) as f:
+            targets = f.readlines()
+        targets = [x.strip() for x in targets]
+        target_list += targets
+    return target_list  
 
-def do_the_classification_job_for_single_eml_file(eml_file_path):
+def do_the_classification_job_for_single_eml_file(eml_file_path,target_list):
     '''
         sending path: A -> B ---> C
         classified path: C >>>> A >>>> B
     '''    
     dst = os.path.dirname(eml_file_path.replace(setttings.SRC_DIR,setttings.DST_DIR))
     eml_header = get_eml_header(eml_file_path)
+    #load target list file
+#    target_list = get_target_list_from_folder(setttings.LIST_OF_TARGET)
+
     try:    
                    
-        print(eml_file_path)
+        #print(eml_file_path)
             #get X-Apparently-To address:
         raw_x = get_eml_header_value_by_key(eml_header,"X-Apparently-To")
         x_apparently_to_addr = re.findall(r'[\w\.-]+@[\w\.-]+',raw_x)    
@@ -83,25 +94,29 @@ def do_the_classification_job_for_single_eml_file(eml_file_path):
         create_folder_if_not_exists(os.path.join(dst,os.path.join(x_apparently_to_addr[0],os.path.join(from_addr_list[0]))),"Outbox")
         copy_eml_file_to_storing_folder(eml_file_path,os.path.join(os.path.join(dst,os.path.join(x_apparently_to_addr[0],from_addr_list[0])),"Outbox"))        
 
-            #   get To address      - there are many of them.. so we have a LIST   
+            #get To address      - there are many of them.. so we have a LIST   
         to_addr_as_big_string = get_eml_header_value_by_key(eml_header,"To")
         if to_addr_as_big_string is not None:
-            to_addr_as_list = get_email_address_from_obfuscated_string(to_addr_as_big_string)    
+            to_addr_as_list = get_email_address_from_obfuscated_string(to_addr_as_big_string)
+
             for each_address in to_addr_as_list:        
                 if from_addr_list[0] == each_address: #create inbox for A Address
                     create_folder_if_not_exists(os.path.join(dst,os.path.join(x_apparently_to_addr[0],from_addr_list[0])),"Inbox") 
                     copy_eml_file_to_storing_folder(eml_file_path,os.path.join(dst,os.path.join(x_apparently_to_addr[0],os.path.join(from_addr_list[0],"Inbox"))))
-
-                write_eml_data_to_csv_file('eml_data.csv',str(eml_file_path).encode('utf-8'),os.path.getsize(eml_file_path),from_addr_list[0],each_address,x_apparently_to_addr[0],str(datetime.datetime.now()))
+                this_time = str(datetime.datetime.now().day) + "-" + str(datetime.datetime.now().month) + "-" + str(datetime.datetime.now().year) 
+                #write_eml_data_to_csv_file('eml_data.csv',str(eml_file_path).encode('utf-8-sig'),os.path.getsize(eml_file_path),from_addr_list[0],each_address,x_apparently_to_addr[0],this_time)
+                write_eml_data_to_csv_file(os.path.join(setttings.CSV_FILE_LOC,'eml_data'+setttings.CURRENT_DAY+setttings.CSV_EXTENSION),eml_file_path,os.path.getsize(eml_file_path),from_addr_list[0],each_address,x_apparently_to_addr[0],this_time)
                 try:
                     create_folder_if_not_exists(os.path.join(os.path.join(dst,os.path.join(x_apparently_to_addr[0],os.path.join(from_addr_list[0],"Outbox")))),each_address)
-                    copy_eml_file_to_storing_folder(eml_file_path,os.path.join(os.path.join(dst,os.path.join(x_apparently_to_addr[0],os.path.join(from_addr_list[0],"Outbox")),each_address)))
+                    if each_address in target_list:
+                        copy_eml_file_to_storing_folder(eml_file_path,os.path.join(os.path.join(dst,os.path.join(x_apparently_to_addr[0],os.path.join(from_addr_list[0],"Outbox")),each_address)))
                 except FileNotFoundError:
                     print("file name too long...")
                     copy_eml_file_to_storing_folder(eml_file_path,os.path.join(dst,os.path.join(x_apparently_to_addr[0],os.path.join(from_addr_list[0],"Outbox"))))
         else:
             create_folder_if_not_exists(os.path.join(dst,x_apparently_to_addr[0]),"Spam")
             copy_eml_file_to_storing_folder(eml_file_path,os.path.join(dst,os.path.join(x_apparently_to_addr[0],"Spam")))
+        #print("successfully copy email file: ",eml_file_path)
 
     except Exception as e:
         create_folder_if_not_exists(dst,"Error_Mail")
@@ -122,7 +137,7 @@ def do_the_classification_job_for_single_eml_file(eml_file_path):
         #else:
         #    print("this eml file doesnt have CC")
         
-        print("successfully created and copy eml file: %r to folders" %(eml_file_path))
+        #print("successfully created and copy eml file: %r to folders" %(eml_file_path))
         setttings.EMAIL_COUNT_FOR_CURRENT_SESSION = setttings.EMAIL_COUNT_FOR_CURRENT_SESSION + 1
         pass
 
@@ -139,7 +154,7 @@ def count_current_email(root_input_path):
 def do_the_classification_job(eml_file_path):
 
     list_of_current_file = get_current_dir_list(eml_file_path)
-    print("list of current file ",list_of_current_file)
+    #print("list of current file ",list_of_current_file)
     #print("list of current eml file",list_of_current_file)
     for each_file in list_of_current_file:
         eml_header = get_eml_header(each_file)
